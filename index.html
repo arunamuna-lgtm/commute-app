@@ -361,15 +361,21 @@ async function loadOverride() {
   const since = Math.floor(Date.now() / 1000) - 4 * 86400;
   const r = await fetch(`https://ntfy.sh/${encodeURIComponent(S.topic)}/json?poll=1&since=${since}`, { cache: "no-store" });
   if (!r.ok) throw new Error("Couldn't read ntfy messages (" + r.status + ").");
-  const target = nextCommuteDay(new Date()).getTime();
+  const targetDay = nextCommuteDay(new Date());
+  const target = targetDay.getTime();
   let found = null;
+  // Messages the agent has already saved (ntfy itself only keeps them ~12 hours)
+  try {
+    const saved = JSON.parse(await ghFile("data/overrides.json") || "{}")[isoDate(targetDay)];
+    if (saved) found = { value: saved.value, when: new Date(saved.sent * 1000) };
+  } catch {}
   for (const line of (await r.text()).split("\n")) {
     let msg; try { msg = JSON.parse(line); } catch { continue; }
     if (msg.event !== "message" || msg.title) continue;
     const v = parseOverride(msg.message);
     if (!v) continue;
     const sent = new Date(msg.time * 1000);
-    if (nextCommuteDay(sent).getTime() === target) found = { value: v, when: sent };
+    if (nextCommuteDay(sent).getTime() === target && (!found || sent >= found.when)) found = { value: v, when: sent };
   }
   OVERRIDE = (found && found.value !== "normal") ? found : null;
 }
