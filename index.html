@@ -222,7 +222,7 @@ details.settings[open] summary::after { content: "Hide"; }
   <section class="panel" aria-labelledby="hist-title">
     <div class="panel-head">
       <h2 id="hist-title">Your mornings</h2>
-      <span class="small muted" id="hist-days">0 weekdays logged</span>
+      <span class="small muted" id="hist-days">0 mornings logged</span>
     </div>
     <div class="stats">
       <div class="stat"><span class="small muted">Safe leave, normal</span><span class="num" id="safe-normal">–</span><span class="small muted" id="safe-normal-note"></span></div>
@@ -306,13 +306,17 @@ function quantile(sorted, q) {
 }
 
 /* ------------------------------------------------------------ which morning (same rule as the agent) */
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function isWorkDay(d) {
+  const days = (CONFIG && CONFIG.work_days) || ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  return days.map(x => String(x).slice(0, 3).toLowerCase()).includes(DAY_NAMES[d.getDay()].toLowerCase());
+}
 function nextCommuteDay(from) {
   const d = new Date(from);
-  const wd = d.getDay(); // 0 Sun .. 6 Sat
   const beforeNine = d.getHours() < 9;
-  if (wd >= 1 && wd <= 5 && beforeNine) { d.setHours(0, 0, 0, 0); return d; }
   d.setHours(0, 0, 0, 0);
-  do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0 || d.getDay() === 6);
+  if (isWorkDay(d) && beforeNine) return d;
+  do { d.setDate(d.getDate() + 1); } while (!isWorkDay(d));
   return d;
 }
 function parseOverride(text) {
@@ -533,7 +537,7 @@ function buildHistory() {
 }
 function safeLeave(series, nDays, arrive) {
   const need = CONFIG.min_days_for_model || 10;
-  if (nDays < need) return { text: "–", note: `${need - nDays} more weekdays needed` };
+  if (nDays < need) return { text: "–", note: `${need - nDays} more mornings needed` };
   const deadline = toMin(arrive);
   const ok = series.filter(p => p.n >= Math.floor(need / 2) && p.slot + p.hi <= deadline);
   if (!ok.length) return { text: "–", note: "Not enough early readings yet" };
@@ -542,7 +546,7 @@ function safeLeave(series, nDays, arrive) {
 
 function renderHistory() {
   const { series, days, byDay } = buildHistory();
-  $("hist-days").textContent = `${days.length} weekday${days.length === 1 ? "" : "s"} logged`;
+  $("hist-days").textContent = `${days.length} morning${days.length === 1 ? "" : "s"} logged`;
   const a = safeLeave(series, days.length, CONFIG.arrive_by), b = safeLeave(series, days.length, S.early);
   $("safe-normal").textContent = a.text; $("safe-normal-note").textContent = a.note;
   $("safe-early").textContent = b.text; $("safe-early-note").textContent = b.note;
