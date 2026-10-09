@@ -160,6 +160,34 @@ details.settings[open] summary::after { content: "Hide"; }
   background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 700; font-size: 0.9rem;
   max-width: calc(100% - 32px); z-index: 10; }
 
+/* Segmented toggle (To work / To home, Leave now / Arrive by / Leave at) */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; background: var(--bg); border-radius: 12px; }
+.seg button { min-height: 40px; border: 0; background: transparent; border-radius: 9px; font-size: 0.9rem; padding: 8px 6px; }
+.seg button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 0 0 1.5px var(--accent); color: var(--ink); }
+
+/* Places */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { min-height: 38px; padding: 7px 12px; border-radius: 999px; font-size: 0.88rem; font-weight: 700; }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.chip .x { margin-left: 6px; color: var(--bad); }
+.row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.field-inline { display: grid; gap: 4px; min-width: 0; }
+.field-inline label { font-size: 0.8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+select, input[type="date"], input[type="search"] {
+  font: 1rem var(--font-body); padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--line);
+  background: var(--bg); color: var(--ink); min-height: 46px; min-width: 0; width: 100%;
+}
+select:focus-visible, input[type="date"]:focus-visible, input[type="search"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.results { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.results button { width: 100%; text-align: left; display: grid; gap: 2px; min-height: 0; padding: 9px 12px; }
+.results .addr { font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+.dest-line { font-size: 0.9rem; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.dest-line strong { font-family: var(--font-display); }
+.save-place { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.save-place input { flex: 1 1 140px; }
+.diff-pos { color: var(--bad); font-weight: 700; }
+.diff-neg { color: var(--good); font-weight: 700; }
+
 @media (prefers-reduced-motion: no-preference) {
   .route { transition: box-shadow 0.2s; }
 }
@@ -213,9 +241,59 @@ details.settings[open] summary::after { content: "Hide"; }
       <h2 id="live-title">Traffic now</h2>
       <span class="small muted" id="live-when">Last agent check: none yet</span>
     </div>
+    <div class="seg" role="group" aria-label="Direction">
+      <button id="dir-work" aria-pressed="true">To work</button>
+      <button id="dir-home" aria-pressed="false">Drive home</button>
+    </div>
     <ul class="routes" id="routes"></ul>
     <div class="leave" id="leave-line"></div>
     <button class="primary" id="btn-check">Check traffic now</button>
+  </section>
+
+  <!-- Trip planner -->
+  <section class="panel" aria-labelledby="trip-title">
+    <div class="panel-head">
+      <h2 id="trip-title">Plan a trip</h2>
+      <span class="small muted" id="trip-when"></span>
+    </div>
+
+    <div class="field-inline">
+      <label for="trip-from">From</label>
+      <select id="trip-from"></select>
+    </div>
+
+    <div class="field-inline">
+      <label>To</label>
+      <div class="chips" id="place-chips" role="group" aria-label="Saved places"></div>
+    </div>
+    <div class="field-inline">
+      <label for="trip-search">Or search a place or postcode</label>
+      <div class="custom">
+        <input type="search" id="trip-search" placeholder="e.g. IP33 3YU or Cambridge station" autocomplete="off" style="flex:1 1 180px">
+        <button id="btn-search">Search</button>
+      </div>
+    </div>
+    <ul class="results" id="search-results"></ul>
+    <div class="dest-line" id="dest-line" hidden></div>
+    <div class="save-place" id="save-place" hidden>
+      <input type="text" id="save-name" placeholder="Name this place, e.g. Gym" maxlength="30">
+      <button id="btn-save-place">Save place</button>
+    </div>
+
+    <div class="seg" role="group" aria-label="When">
+      <button id="when-now" aria-pressed="true">Leave now</button>
+      <button id="when-arrive" aria-pressed="false">Arrive by</button>
+      <button id="when-depart" aria-pressed="false">Leave at</button>
+    </div>
+    <div class="row2" id="when-inputs" hidden>
+      <div class="field-inline"><label for="trip-date">Date</label><input type="date" id="trip-date"></div>
+      <div class="field-inline"><label for="trip-time">Time</label><input type="time" id="trip-time" value="14:30"></div>
+    </div>
+
+    <button class="primary" id="btn-plan">Plan trip</button>
+    <ul class="routes" id="trip-routes"></ul>
+    <div class="leave" id="trip-summary"></div>
+    <button id="btn-edit-places" class="small" style="justify-self:start; min-height:38px; padding:6px 12px">Edit saved places</button>
   </section>
 
   <!-- History -->
@@ -233,6 +311,16 @@ details.settings[open] summary::after { content: "Hide"; }
       <div class="small muted">Line: typical morning. Shaded: best to worst 10% of mornings.</div>
     </div>
     <div class="chart" id="chart"></div>
+    <div>
+      <div class="small" style="font-weight:700">Real journeys</div>
+      <div class="small muted" id="real-note">Logged automatically when your phone leaves home and reaches the car park.</div>
+    </div>
+    <div class="table-wrap">
+      <table aria-label="Real journeys">
+        <thead><tr><th>Day</th><th>Left</th><th class="r">Took</th><th class="r">vs TomTom</th></tr></thead>
+        <tbody id="real"></tbody>
+      </table>
+    </div>
     <div class="table-wrap">
       <table aria-label="Recent mornings">
         <thead><tr><th>Morning</th><th class="r">Fastest</th><th class="r">Slowest</th><th class="r">Checks</th></tr></thead>
@@ -414,23 +502,40 @@ function labelRoute(rt) {
   return { roads: ["A14"], jn: null, via, hops: [] };
 }
 
+/* generic TomTom routing: from/to are "lat,lon"; opts: {departAt: Date} or {arriveAt: Date} */
+function isoLocal(d) {
+  const off = -d.getTimezoneOffset(), sign = off >= 0 ? "+" : "-", a = Math.abs(off);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00${sign}${pad(Math.floor(a / 60))}:${pad(a % 60)}`;
+}
+async function route(from, to, opts = {}) {
+  if (!S.tomtom) throw new Error("Add your TomTom key in Settings to plan journeys.");
+  let when = "&departAt=now";
+  if (opts.arriveAt) when = "&arriveAt=" + encodeURIComponent(isoLocal(opts.arriveAt));
+  else if (opts.departAt) when = "&departAt=" + encodeURIComponent(isoLocal(opts.departAt));
+  const base = `https://api.tomtom.com/routing/1/calculateRoute/${from}:${to}/json?key=${encodeURIComponent(S.tomtom)}` +
+    `&traffic=true&travelMode=car&computeTravelTimeFor=all&instructionsType=text${when}`;
+  let r = await fetch(base + "&maxAlternatives=2");
+  if (r.status === 400) r = await fetch(base);            // some time options don't allow alternatives
+  if (r.status === 403 || r.status === 401) throw new Error("TomTom refused the key. Check it in Settings.");
+  if (r.status === 400) throw new Error("TomTom couldn't plan that trip. Check the time is in the future.");
+  if (!r.ok) throw new Error("TomTom error " + r.status);
+  const data = await r.json();
+  return (data.routes || []).map(rt => {
+    const s = rt.summary;
+    return { label: labelRoute(rt), km: s.lengthInMeters / 1000, live: s.travelTimeInSeconds / 60,
+      typical: (s.historicTrafficTravelTimeInSeconds || s.travelTimeInSeconds) / 60,
+      depart: s.departureTime ? new Date(s.departureTime) : null, arrive: s.arrivalTime ? new Date(s.arrivalTime) : null };
+  }).sort((a, b) => a.live - b.live);
+}
+
+let DIR = "work";
 async function liveCheck() {
   if (DEMO || !S.tomtom || !CONFIG.home) {
     LIVE = demoLive(); renderLive("Example result");
     if (!DEMO && !S.tomtom) toast("Add your TomTom key in Settings for a real check.");
     return;
   }
-  const url = `https://api.tomtom.com/routing/1/calculateRoute/${CONFIG.home}:${CONFIG.work}/json?key=${encodeURIComponent(S.tomtom)}` +
-    `&traffic=true&travelMode=car&departAt=now&maxAlternatives=2&computeTravelTimeFor=all&instructionsType=text`;
-  const r = await fetch(url);
-  if (r.status === 403 || r.status === 401) throw new Error("TomTom refused the key. Check it in Settings.");
-  if (!r.ok) throw new Error("TomTom error " + r.status);
-  const data = await r.json();
-  LIVE = (data.routes || []).map(rt => {
-    const s = rt.summary;
-    return { label: labelRoute(rt), km: s.lengthInMeters / 1000, live: s.travelTimeInSeconds / 60,
-      typical: (s.historicTrafficTravelTimeInSeconds || s.travelTimeInSeconds) / 60 };
-  }).sort((a, b) => a.live - b.live);
+  LIVE = DIR === "work" ? await route(CONFIG.home, CONFIG.work) : await route(CONFIG.work, CONFIG.home);
   renderLive("Checked " + hhmm(new Date()));
 }
 
@@ -501,6 +606,11 @@ function renderLive(whenText) {
 function renderLeave() {
   const el = $("leave-line");
   if (!LIVE || !LIVE.length) { el.textContent = ""; return; }
+  if (DIR === "home") {
+    const eta = new Date(Date.now() + LIVE[0].live * 60000);
+    el.innerHTML = `Leave now and you're home about <strong>${hhmm(eta)}</strong>.`;
+    return;
+  }
   const t = targetArrival();
   if (!t.arrive) { el.textContent = "Day off set for the next commute."; return; }
   const leave = toMin(t.arrive) - LIVE[0].live - (CONFIG.buffer_minutes || 5);
@@ -644,6 +754,201 @@ function demoLive() {
   ];
 }
 
+/* ------------------------------------------------------------ places & trip planner */
+const esc = v => String(v).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const DEFAULT_PLACES = [
+  { name: "Bury St Edmunds station", q: "Bury St Edmunds railway station" },
+  { name: "Bury town centre", q: "Abbeygate Street, Bury St Edmunds" },
+];
+let PLACES = (() => { try { const v = JSON.parse(localStorage.getItem("cm_places") || "null"); return Array.isArray(v) ? v : DEFAULT_PLACES.slice(); } catch { return DEFAULT_PLACES.slice(); } })();
+function savePlaces() { try { localStorage.setItem("cm_places", JSON.stringify(PLACES)); } catch {} }
+let DEST = null;          // { name, pos: "lat,lon", address? }
+let PENDING = null;       // search result not yet saved
+let WHEN = "now";
+let EDITING = false;
+
+function allPlaces() {
+  const fixed = [];
+  if (CONFIG.home) fixed.push({ name: "Home", pos: CONFIG.home, fixed: true });
+  if (CONFIG.work) fixed.push({ name: "Work", pos: CONFIG.work, fixed: true });
+  return fixed.concat(PLACES.map((p, i) => ({ ...p, idx: i })));
+}
+
+async function search(q, limit = 5) {
+  if (!S.tomtom) throw new Error("Add your TomTom key in Settings to search places.");
+  let bias = "";
+  if (CONFIG.home) { const [la, lo] = CONFIG.home.split(","); bias = `&lat=${la}&lon=${lo}`; }
+  const r = await fetch(`https://api.tomtom.com/search/2/search/${encodeURIComponent(q)}.json?key=${encodeURIComponent(S.tomtom)}&countrySet=GB&limit=${limit}${bias}`);
+  if (r.status === 403 || r.status === 401) throw new Error("TomTom refused the key. Check it in Settings.");
+  if (!r.ok) throw new Error("Search failed (" + r.status + ").");
+  const data = await r.json();
+  return (data.results || []).map(x => ({
+    name: (x.poi && x.poi.name) || x.address.freeformAddress,
+    address: x.address.freeformAddress,
+    pos: `${x.position.lat.toFixed(6)},${x.position.lon.toFixed(6)}`,
+  }));
+}
+
+async function resolvePlace(p) {
+  if (p.pos) return p.pos;
+  const res = await search(p.q, 1);
+  if (!res.length) throw new Error(`Couldn't find ${p.name}. Remove it and add it again from search.`);
+  p.pos = res[0].pos; p.address = res[0].address; savePlaces();
+  return p.pos;
+}
+
+function renderPlaces() {
+  const box = $("place-chips"); box.innerHTML = "";
+  allPlaces().forEach(p => {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.setAttribute("aria-pressed", String(!!DEST && DEST.name === p.name));
+    b.innerHTML = esc(p.name) + (EDITING && !p.fixed ? '<span class="x" aria-hidden="true">✕</span>' : "");
+    if (EDITING && !p.fixed) b.setAttribute("aria-label", "Remove " + p.name);
+    b.addEventListener("click", guard(async () => {
+      if (EDITING && !p.fixed) {
+        PLACES.splice(p.idx, 1); savePlaces();
+        if (DEST && DEST.name === p.name) { setDest(null); return; }
+        renderPlaces(); return;
+      }
+      const pos = p.fixed ? p.pos : await resolvePlace(PLACES[p.idx]);
+      setDest({ name: p.name, pos, address: p.address });
+    }));
+    box.appendChild(b);
+  });
+  $("btn-edit-places").textContent = EDITING ? "Done editing" : "Edit saved places";
+  renderFrom();
+}
+
+function renderFrom() {
+  const sel = $("trip-from"), keep = sel.value;
+  sel.innerHTML = "";
+  const opts = [["here", "Where I am now"]].concat(allPlaces().map(p => ["p:" + p.name, p.name]));
+  opts.forEach(([v, t]) => { const o = document.createElement("option"); o.value = v; o.textContent = t; sel.appendChild(o); });
+  sel.value = opts.some(o => o[0] === keep) ? keep : (CONFIG.home ? "p:Home" : "here");
+}
+
+function setDest(d, fromSearch = false) {
+  DEST = d; PENDING = fromSearch ? d : null;
+  const line = $("dest-line");
+  $("search-results").innerHTML = "";
+  if (!d) { line.hidden = true; $("save-place").hidden = true; renderPlaces(); return; }
+  line.hidden = false;
+  line.innerHTML = `Going to <strong>${esc(d.name)}</strong>${d.address && d.address !== d.name ? ` <span class="muted">${esc(d.address)}</span>` : ""}`;
+  $("save-place").hidden = !fromSearch;
+  if (fromSearch) $("save-name").value = "";
+  renderPlaces();
+}
+
+function hereNow() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error("This browser can't share your location."));
+    navigator.geolocation.getCurrentPosition(
+      p => resolve(`${p.coords.latitude.toFixed(6)},${p.coords.longitude.toFixed(6)}`),
+      e => reject(new Error(e.code === 1 ? "Location is blocked. Allow it for this app in Chrome's site settings." : "Couldn't get your location. Try again or pick a place.")),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+  });
+}
+
+async function originPos() {
+  const v = $("trip-from").value;
+  if (v === "here") return { name: "your location", pos: await hereNow() };
+  const name = v.slice(2), p = allPlaces().find(x => x.name === name);
+  if (!p) throw new Error("Pick where you're starting from.");
+  return { name, pos: p.fixed ? p.pos : await resolvePlace(PLACES[p.idx]) };
+}
+
+function setWhen(w) {
+  WHEN = w;
+  ["now", "arrive", "depart"].forEach(k => $("when-" + k).setAttribute("aria-pressed", String(k === w)));
+  $("when-inputs").hidden = w === "now";
+}
+
+function chosenTime() {
+  const d = $("trip-date").value, t = $("trip-time").value;
+  if (!d || !t) throw new Error("Pick a date and time.");
+  const when = new Date(`${d}T${t}:00`);
+  if (when.getTime() < Date.now() - 60000) throw new Error("Pick a time in the future.");
+  return when;
+}
+function sameDay(d) { return isoDate(d) === isoDate(new Date()); }
+function dayTag(d) { return sameDay(d) ? "" : " on " + d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }); }
+
+async function planTrip() {
+  if (!DEST) throw new Error("Choose where you're going: tap a place or search.");
+  const from = await originPos();
+  if (from.pos === DEST.pos) throw new Error("Start and destination are the same place.");
+  const list = $("trip-routes"), sum = $("trip-summary");
+  list.innerHTML = ""; sum.textContent = "";
+  let routes, label;
+  if (WHEN === "arrive") {
+    const at = chosenTime();
+    routes = await route(from.pos, DEST.pos, { arriveAt: at });
+    if (!routes.length) throw new Error("No route found.");
+    const best = routes[0], buffer = CONFIG.buffer_minutes || 5;
+    const leave = new Date((best.depart ? best.depart.getTime() : at.getTime() - best.live * 60000) - buffer * 60000);
+    label = `Leave by <strong>${hhmm(leave)}</strong> to reach ${esc(DEST.name)} by ${hhmm(at)}${dayTag(at)}.` +
+      ` <span class="small muted">Includes ${buffer} min spare, based on typical traffic for that time.</span>`;
+  } else if (WHEN === "depart") {
+    const at = chosenTime();
+    routes = await route(from.pos, DEST.pos, { departAt: at });
+    if (!routes.length) throw new Error("No route found.");
+    const arr = routes[0].arrive || new Date(at.getTime() + routes[0].live * 60000);
+    label = `Leave ${hhmm(at)}${dayTag(at)} and arrive about <strong>${hhmm(arr)}</strong>. <span class="small muted">Based on typical traffic for that time.</span>`;
+  } else {
+    routes = await route(from.pos, DEST.pos);
+    if (!routes.length) throw new Error("No route found.");
+    const arr = new Date(Date.now() + routes[0].live * 60000);
+    label = `Leave now and arrive about <strong>${hhmm(arr)}</strong>.`;
+  }
+  routes.forEach((r, i) => {
+    const li = document.createElement("li");
+    li.className = "route" + (i === 0 ? " best" : "");
+    const diff = r.live - r.typical;
+    const tag = WHEN !== "now" ? "" : diff >= 8 ? `<span class="tag bad">+${Math.round(diff)} min vs usual</span>`
+      : diff >= 3 ? `<span class="tag warn">+${Math.round(diff)} min vs usual</span>` : "";
+    li.innerHTML = `<div class="name">${routeName(r.label)}</div><div class="mins">${Math.round(r.live)}<small> min</small></div>
+      <div class="meta"><span>${r.km.toFixed(1)} km</span>${tag}${i === 0 ? '<span class="tag good">Fastest</span>' : ""}</div>`;
+    list.appendChild(li);
+  });
+  sum.innerHTML = label;
+  $("trip-when").textContent = `From ${from.name}`;
+}
+
+/* ------------------------------------------------------------ real journeys */
+let JOURNEYS = [];
+function renderReal() {
+  const tb = $("real"); tb.innerHTML = "";
+  const rows = JOURNEYS.slice().reverse().slice(0, 10);
+  $("real-note").textContent = "Logged automatically when your phone leaves home and reaches the car park.";
+  if (!rows.length) { tb.innerHTML = `<tr><td colspan="4" class="muted" style="white-space:normal">Your first real journey appears here once the geofence is set up.</td></tr>`; return; }
+  rows.forEach(j => {
+    const dt = new Date(j.date + "T12:00:00");
+    const d = j.predicted_min == null ? null : j.actual_min - j.predicted_min;
+    const diff = d == null ? "–" : `<span class="${d > 0.5 ? "diff-pos" : d < -0.5 ? "diff-neg" : ""}">${d > 0 ? "+" : ""}${Math.round(d)} min</span>`;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${dt.toLocaleDateString("en-GB", { weekday: "short", day: "numeric" })}</td><td>${esc(j.left)}</td>
+      <td class="r">${Math.round(j.actual_min)} min</td><td class="r">${diff}</td>`;
+    tb.appendChild(tr);
+  });
+  const withPred = JOURNEYS.filter(j => j.predicted_min != null);
+  if (withPred.length) {
+    const avg = withPred.reduce((a, j) => a + (j.actual_min - j.predicted_min), 0) / withPred.length;
+    $("real-note").textContent = `${JOURNEYS.length} journey${JOURNEYS.length === 1 ? "" : "s"} logged. On average your drive takes ` +
+      (Math.abs(avg) < 0.5 ? "about what TomTom predicts." : `${Math.abs(avg).toFixed(0)} min ${avg > 0 ? "longer" : "less"} than TomTom predicts.`);
+  }
+}
+function demoJourneys() {
+  const out = [], d = new Date(); d.setHours(12, 0, 0, 0);
+  const sample = [[8, 2, 26, 22], [8, 6, 24, 23], [7, 58, 21, 21], [8, 10, 29, 24], [8, 4, 23, 22]];
+  let k = 0;
+  while (out.length < sample.length) {
+    d.setDate(d.getDate() - 1); const [h, m, a, p] = sample[k++];
+    out.push({ date: isoDate(d), left: `${pad(h)}:${pad(m)}`, arrived: fromMin(h * 60 + m + a), actual_min: a, predicted_min: p });
+  }
+  return out.reverse();
+}
+
 /* ------------------------------------------------------------ wiring */
 function guard(fn) { return async (...a) => { try { showError(""); await fn(...a); } catch (e) { showError(e.message || String(e)); } }; }
 $("btn-normal").addEventListener("click", guard(() => sendOverride("normal")));
@@ -653,6 +958,52 @@ $("btn-custom").addEventListener("click", guard(() => { const v = parseOverride(
 $("btn-check").addEventListener("click", guard(async () => {
   const b = $("btn-check"); b.disabled = true; b.textContent = "Checking…";
   try { await liveCheck(); } finally { b.disabled = false; b.textContent = "Check traffic now"; }
+}));
+
+function setDir(d) {
+  DIR = d;
+  $("dir-work").setAttribute("aria-pressed", String(d === "work"));
+  $("dir-home").setAttribute("aria-pressed", String(d === "home"));
+  $("btn-check").textContent = d === "work" ? "Check traffic now" : "Check drive home";
+}
+$("dir-work").addEventListener("click", guard(async () => { setDir("work"); if (!DEMO) await liveCheck(); else renderLeave(); }));
+$("dir-home").addEventListener("click", guard(async () => { setDir("home"); if (!DEMO) await liveCheck(); else renderLeave(); }));
+$("btn-search").addEventListener("click", guard(async () => {
+  const q = $("trip-search").value.trim();
+  if (!q) throw new Error("Type a place name or postcode.");
+  const b = $("btn-search"); b.disabled = true; b.textContent = "Searching…";
+  try {
+    const res = DEMO ? [{ name: "Example: Cambridge station", address: "Station Road, Cambridge CB1 2JW", pos: "52.194,0.137" }] : await search(q);
+    const ul = $("search-results"); ul.innerHTML = "";
+    if (!res.length) { ul.innerHTML = `<li class="small muted">No matches. Try a postcode or add the town name.</li>`; return; }
+    res.forEach(x => {
+      const li = document.createElement("li"), bt = document.createElement("button");
+      bt.innerHTML = `<span>${esc(x.name)}</span><span class="addr">${esc(x.address)}</span>`;
+      bt.addEventListener("click", () => setDest(x, true));
+      li.appendChild(bt); ul.appendChild(li);
+    });
+  } finally { b.disabled = false; b.textContent = "Search"; }
+}));
+$("trip-search").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("btn-search").click(); } });
+$("btn-save-place").addEventListener("click", guard(() => {
+  if (!PENDING) return;
+  const name = $("save-name").value.trim() || PENDING.name;
+  if (["home", "work"].includes(name.toLowerCase())) throw new Error("Home and Work are already saved. Pick another name.");
+  PLACES = PLACES.filter(p => p.name.toLowerCase() !== name.toLowerCase());
+  PLACES.push({ name, pos: PENDING.pos, address: PENDING.address });
+  savePlaces();
+  setDest({ name, pos: PENDING.pos, address: PENDING.address });
+  toast(`Saved ${name}`);
+}));
+$("btn-edit-places").addEventListener("click", () => { EDITING = !EDITING; renderPlaces(); });
+["now", "arrive", "depart"].forEach(k => $("when-" + k).addEventListener("click", () => setWhen(k)));
+$("trip-date").value = isoDate(new Date());
+$("btn-plan").addEventListener("click", guard(async () => {
+  const b = $("btn-plan"); b.disabled = true; b.textContent = "Planning…";
+  try {
+    if (DEMO) { toast("Example only. Add your TomTom key in Settings to plan real trips."); return; }
+    await planTrip();
+  } finally { b.disabled = false; b.textContent = "Plan trip"; }
 }));
 
 $("s-repo").value = S.repo; $("s-gh").value = S.gh; $("s-topic").value = S.topic; $("s-tomtom").value = S.tomtom; $("s-early").value = S.early;
@@ -669,14 +1020,16 @@ async function start() {
     $("demo-banner").hidden = false;
     ROWS = demoRows();
     LIVE = demoLive();
-    renderNext(); renderLive("Example result"); renderHistory();
+    JOURNEYS = demoJourneys();
+    CONFIG.home = CONFIG.home || "52.2227,0.8978"; CONFIG.work = CONFIG.work || "52.2293,0.7071";
+    renderNext(); renderLive("Example result"); renderHistory(); renderPlaces(); renderReal();
     return;
   }
-  renderNext(); renderLive("");
+  renderNext(); renderLive(""); renderPlaces(); renderReal();
   try {
     const cfg = await ghFile("config.json");
     if (cfg) CONFIG = Object.assign(CONFIG, JSON.parse(cfg));
-    renderNext();
+    renderNext(); renderPlaces();
   } catch (e) { showError(e.message); }
   try { await loadOverride(); renderNext(); } catch (e) { showError(e.message); }
   try {
@@ -684,6 +1037,11 @@ async function start() {
     ROWS = csv ? parseCSV(csv) : [];
   } catch (e) { showError(e.message); }
   renderHistory();
+  try {
+    const j = await ghFile("data/journeys.json");
+    JOURNEYS = j ? (JSON.parse(j).journeys || []) : [];
+  } catch (e) { JOURNEYS = []; }
+  renderReal();
 }
 start();
 
