@@ -540,6 +540,7 @@ async function liveCheck() {
 }
 
 /* ------------------------------------------------------------ rendering */
+let AGENT = null;  // data/state.json: the agent's briefing and latest check for today
 function targetArrival() {
   if (!OVERRIDE) return { arrive: CONFIG.arrive_by, kind: "normal" };
   if (OVERRIDE.value === "off") return { arrive: null, kind: "off" };
@@ -563,7 +564,16 @@ function renderNext() {
     $("park-label").hidden = false;
     $("next-park").textContent = t.arrive;
     const brief = toMin(t.arrive) - (CONFIG.brief_minutes_before_arrival || 90);
-    $("next-brief").textContent = `Briefing about ${fromMin(brief)}`;
+    // The agent's own latest check for this morning (from data/state.json), if there is one.
+    const L = AGENT && AGENT.date === isoDate(day) && AGENT.latest;
+    if (L && L.arrive === t.arrive) {
+      const e = v => String(v).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+      const b = AGENT.brief;
+      $("next-brief").innerHTML = `Leave by <strong style="font-size:1.35em">${e(L.leave)}</strong><br>${e(L.min)} min, checked ${e(L.at)}` +
+        (b && b.leave !== L.leave ? `<br>Briefing said ${e(b.leave)}` : "");
+    } else {
+      $("next-brief").textContent = `Briefing about ${fromMin(brief)}`;
+    }
     $("next-status").textContent = t.kind === "normal" ? "Normal day" : (t.kind === "early" ? "Early start" : "Custom time");
   }
   $("btn-normal").setAttribute("aria-pressed", String(t.kind === "normal"));
@@ -1032,6 +1042,11 @@ async function start() {
     renderNext(); renderPlaces();
   } catch (e) { showError(e.message); }
   try { await loadOverride(); renderNext(); } catch (e) { showError(e.message); }
+  try {
+    const st = await ghFile("data/state.json");
+    AGENT = st ? JSON.parse(st) : null;
+    renderNext();
+  } catch (e) { AGENT = null; }
   try {
     const csv = await ghFile("data/commute_log.csv");
     ROWS = csv ? parseCSV(csv) : [];
